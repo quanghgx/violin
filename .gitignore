@@ -1,3 +1,7 @@
 *.[oa]
 train/
 test/
+.vscode/
+learn
+test_feature
+test_ppm
