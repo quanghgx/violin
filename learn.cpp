@@ -108,8 +108,10 @@ strong_classifier adaboost_learning( cascade_classifier& cc,
     while( cfpr > minfpr )
     {
         if( sc.fpr( trainNegative ) == 0 )
+        {
+            printf("All training samples correctly classified. Could not achieve target FPR.\n");
             break; // all training negative samples classified correctly. could not achieve validation target
-
+        }
         double wsum = accumulate( weights.begin(), weights.end(), 0.0 );
         printf("wsum = %f\n",wsum);
         transform( weights.begin(), weights.end(), weights.begin(), [wsum](double v){ return v / wsum; } );
@@ -121,10 +123,19 @@ strong_classifier adaboost_learning( cascade_classifier& cc,
         for( auto& f : features )
         {
             weak_classifier wc( f );
+
+            //auto r1 = async( launch::async,
+              //               [&](){
+                //                 for( size_t i = 0; i < (trainPositiveSize/2); ++i )
+                  //                  fvalues[i] = feature_value( f, trainPositive[i], 0, 0 );
+                    //         } );
+
+#if 1
             for( size_t i = 0; i < trainPositiveSize; ++i )
                 fvalues[i] = feature_value( f, trainPositive[i], 0, 0 );
             for( size_t i = 0; i < trainNegativeSize; ++i )
                 fvalues[trainPositiveSize+i] = feature_value( f, trainNegative[i], 0, 0 );
+#endif
             double wcerror = wc.find_optimum_threshold( fvalues, trainPositiveSize, trainNegativeSize, weights );
             if( wcerror < minerror )
             {
@@ -164,12 +175,7 @@ const uint16_t BASE_RES_H = 32;
 int main( int argc, char* argv[] )
 {
     //
-    // To DO
-    //
-    // - Currently doing aspect incorrect resize on images
-    //   - Compute mean aspect ratio (MAR) for dataset
-    //   - Compute feature resolution using MAR
-    //   - optionally crop or pad images that need it
+    // To Do
     //
     // - Need some storage mechanism for cascade classifier
     //   - features can be regenerated, but we need to store
@@ -177,24 +183,15 @@ int main( int argc, char* argv[] )
     //     their associated weights
     //
 
-    vector<image_resources> trainPositive, trainNegative;
-    vector<image_resources> testPositive, testNegative;
+    vector<image_resources> trainP, trainN;
+    load_dataset( "train", BASE_RES_W, trainP, trainN );
+    printf("  %lu positive samples loaded...\n", trainP.size());
+    printf("  %lu negative samples loaded...\n", trainN.size());
 
-    try
-    {
-    load_dataset( "/home/td/vj/vj++/train", BASE_RES_W, trainPositive, trainNegative );
-    printf("  %lu positive samples loaded...\n", trainPositive.size());
-    printf("  %lu negative samples loaded...\n", trainNegative.size());
-
-    load_dataset( "/home/td/vj/vj++/test", BASE_RES_W, testPositive, testNegative );
-    printf("  %lu positive samples loaded...\n", testPositive.size());
-    printf("  %lu negative samples loaded...\n", testNegative.size());
-    }
-    catch (const std::exception& ex)
-    {
-        printf("dataset exception: %s",ex.what());
-    }
-
+    vector<image_resources> testP, testN;
+    load_dataset( "test", BASE_RES_W, testP, testN );
+    printf("  %lu positive samples loaded...\n", testP.size());
+    printf("  %lu negative samples loaded...\n", testN.size());
 
     auto features = generate_feature_set( BASE_RES_W );
     printf("Resolution %uX%u creates %lu features.\n",BASE_RES_W,BASE_RES_H,features.size());
@@ -203,9 +200,9 @@ int main( int argc, char* argv[] )
 
     cascade_classifier cc( BASE_RES_W );
 
-    auto trainPositiveIntegrals = slice_dataset_integral(trainPositive);
-    auto trainNegativeIntegrals = slice_dataset_integral(trainNegative);
-    auto trainVerifyIntegrals = slice_dataset_integral(trainNegative);
+    auto trainPI = slice_dataset_integral(trainP);
+    auto trainNI = slice_dataset_integral(trainN);
+    auto trainVI = slice_dataset_integral(testN);
 
     double fprGoals[] { 0.85, 0.70, 0.55, 0.40, 0.30, 0.25, 0.20 };
 
@@ -214,16 +211,17 @@ int main( int argc, char* argv[] )
         printf("goal: %f\n",goal);
         fflush(stdout);
         
-        vector<image<double>> misclassifiedNegativeIntegrals;
-        for( auto ni : trainNegativeIntegrals )
-            if( cc.classify( ni, 0, 0, 0.0, 1.0 ) == true )
-                misclassifiedNegativeIntegrals.push_back( ni );
+        vector<image<double>> negatives;
+
+        copy_if( trainNI.begin(), trainNI.end(),
+                 back_inserter(negatives),
+                 [&]( const image<double>& img ) { return cc.classify( img, 0, 0, 0.0, 1.0 ); } );
 
         strong_classifier sc = adaboost_learning( cc,
                                                   features,
-                                                  trainPositiveIntegrals,
-                                                  misclassifiedNegativeIntegrals,
-                                                  trainVerifyIntegrals,
+                                                  trainPI,
+                                                  negatives,
+                                                  trainVI,
                                                   goal,
                                                   0.01,
                                                   BASE_RES_W );
@@ -231,44 +229,44 @@ int main( int argc, char* argv[] )
         cc.push_back( sc );
 
         size_t fdel = 0, nfdel=0;
-        for( size_t n=0; n<trainNegativeIntegrals.size(); ++n )
+        for( size_t n=0; n<trainNI.size(); ++n )
         {
-            if(sc.classify(trainNegativeIntegrals[n], 0, 0, 0.0, 1.0) == false)
+            if(sc.classify(trainNI[n], 0, 0, 0.0, 1.0) == false)
             {
-                trainNegativeIntegrals.erase(trainNegativeIntegrals.begin()+n);
+                trainNI.erase(trainNI.begin()+n);
                 n--;
                 nfdel++;
             }
         }
-        for( size_t n=0; n<trainPositiveIntegrals.size(); n++)
+        for( size_t n=0; n<trainPI.size(); n++)
         {
-            if (sc.classify(trainPositiveIntegrals[n], 0, 0, 0.0, 1.0) == false)
+            if (sc.classify(trainPI[n], 0, 0, 0.0, 1.0) == false)
             {
-                trainPositiveIntegrals.erase(trainPositiveIntegrals.begin()+n);
+                trainPI.erase(trainPI.begin()+n);
                 n--;
                 fdel++;
             }
         }
     }
 
-    auto testPositiveIntegrals = slice_dataset_integral(testPositive);
-    auto testNegativeIntegrals = slice_dataset_integral(testNegative);
+    auto testPI = slice_dataset_integral(testP);
+    auto testNI = slice_dataset_integral(testN);
 
     size_t numCorrect = 0;
-    for( auto& vi : testPositiveIntegrals )
+    for( auto& vi : testPI )
         if( cc.classify( vi, 0, 0, 0.0, 1.0 ) == true )
             ++numCorrect;
 
     printf("numCorrect (positive) = %lu\n",numCorrect);
     fflush(stdout);
 
-    for( auto& vi : testNegativeIntegrals )
+    for( auto& vi : testNI )
         if( cc.classify( vi, 0, 0, 0.0, 1.0 ) == false )
             ++numCorrect;
 
     printf("total numCorrect = %lu\n",numCorrect);
 
-    printf("Accuracy: %f\n",(double)numCorrect / (double)(testPositiveIntegrals.size() + testNegativeIntegrals.size()));
+    printf("Accuracy: %f\n",(double)numCorrect / (double)(testPI.size() + testNI.size()));
 
     return 0;
 }
