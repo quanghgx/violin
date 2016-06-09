@@ -66,7 +66,8 @@ void load_dataset( const string& path,
             }
 
             ir.lum = image_argb_to_lum<double>( ir.cropped );
-            ir.integral = image_integral( ir.lum );
+            auto norm = image_normalize( ir.lum );
+            ir.integral = image_integral( norm );
             s.second.push_back( ir );
         }
     }
@@ -112,7 +113,9 @@ strong_classifier adaboost_learning( cascade_classifier& cc,
         double wsum = accumulate( weights.begin(), weights.end(), 0.0 );
         printf("wsum = %f\n",wsum);
         transform( weights.begin(), weights.end(), weights.begin(), [wsum](double v){ return v / wsum; } );
-
+        double wsum2 = accumulate( weights.begin(), weights.end(), 0.0 );
+        printf("wsum2 = %f\n",wsum2);
+        
         double minerror = 1.0;
         weak_classifier bestwc;
         for( auto& f : features )
@@ -210,11 +213,16 @@ int main( int argc, char* argv[] )
     {
         printf("goal: %f\n",goal);
         fflush(stdout);
+        
+        vector<image<double>> misclassifiedNegativeIntegrals;
+        for( auto ni : trainNegativeIntegrals )
+            if( cc.classify( ni, 0, 0, 0.0, 1.0 ) == true )
+                misclassifiedNegativeIntegrals.push_back( ni );
 
         strong_classifier sc = adaboost_learning( cc,
                                                   features,
                                                   trainPositiveIntegrals,
-                                                  trainNegativeIntegrals,
+                                                  misclassifiedNegativeIntegrals,
                                                   trainVerifyIntegrals,
                                                   goal,
                                                   0.01,

@@ -40,6 +40,7 @@ bool strong_classifier::classify( const image<double>& img, uint16_t x, uint16_t
 
 void strong_classifier::add( const weak_classifier& wc, double weight )
 {
+    printf("Adding WC with weight %f\n",weight);
     _wcs.push_back( wc );
     _weights.push_back( weight );
 }
