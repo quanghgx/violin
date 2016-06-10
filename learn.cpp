@@ -15,6 +15,7 @@ struct image_resources
     image<uint32_t> scaled;
     image<uint32_t> cropped;
     image<double> lum;
+    image<double> normalized;
     image<double> integral;
 };
 
@@ -66,8 +67,8 @@ void load_dataset( const string& path,
             }
 
             ir.lum = image_argb_to_lum<double>( ir.cropped );
-            auto norm = image_normalize( ir.lum );
-            ir.integral = image_integral( norm );
+            ir.normalized = image_normalize( ir.lum );
+            ir.integral = image_integral( ir.normalized );
             s.second.push_back( ir );
         }
     }
@@ -118,6 +119,20 @@ strong_classifier adaboost_learning( cascade_classifier& cc,
         for( auto& f : features )
         {
             weak_classifier wc( f );
+
+#if 0
+            auto b = fvalues.begin();
+            parallel_for( b, b + trainPositiveSize,
+                          [f,&trainPositive,b]( vector<double>::iterator i ) {
+                              *i = feature_value( f, trainPositive[i-b], 0, 0 );
+                          } );
+
+            b = fvalues.begin() + trainPositiveSize;
+            parallel_for( b, b + trainNegativeSize,
+                          [f,&trainNegative,b]( vector<double>::iterator i ) {
+                              *i = feature_value( f, trainNegative[i-b], 0, 0 );
+                          } );
+#endif
             for( size_t i = 0; i < trainPositiveSize; ++i )
                 fvalues[i] = feature_value( f, trainPositive[i], 0, 0 );
             for( size_t i = 0; i < trainNegativeSize; ++i )
@@ -176,21 +191,13 @@ int main( int argc, char* argv[] )
     vector<image_resources> trainPositive, trainNegative;
     vector<image_resources> testPositive, testNegative;
 
-    try
-    {
-    load_dataset( "/home/td/vj/vj++/train", BASE_RES_W, trainPositive, trainNegative );
+    load_dataset( "train", BASE_RES_W, trainPositive, trainNegative );
     printf("  %lu positive samples loaded...\n", trainPositive.size());
     printf("  %lu negative samples loaded...\n", trainNegative.size());
 
-    load_dataset( "/home/td/vj/vj++/test", BASE_RES_W, testPositive, testNegative );
+    load_dataset( "test", BASE_RES_W, testPositive, testNegative );
     printf("  %lu positive samples loaded...\n", testPositive.size());
     printf("  %lu negative samples loaded...\n", testNegative.size());
-    }
-    catch (const std::exception& ex)
-    {
-        printf("dataset exception: %s",ex.what());
-    }
-
 
     auto features = generate_feature_set( BASE_RES_W );
     printf("Resolution %uX%u creates %lu features.\n",BASE_RES_W,BASE_RES_H,features.size());

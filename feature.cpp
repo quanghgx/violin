@@ -52,6 +52,7 @@ double feature_value( const feature& f, const image<double>& ii, uint16_t x, uin
     default:
       break;
   }
+  return 0.0;
 }
 
 void feature_scale( feature& f, double s )

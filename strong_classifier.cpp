@@ -73,7 +73,7 @@ void strong_classifier::optimize_threshold( const vector<image<double>>& positiv
 
     size_t maxfnrind = maxfnr * positiveSetSize;
 
-    if( maxfnrind >= 0 && maxfnrind < positiveSetSize )
+    if( maxfnrind < positiveSetSize )
     {
         thr = scores[maxfnrind];
         while( maxfnrind > 0 && scores[maxfnrind] == thr )

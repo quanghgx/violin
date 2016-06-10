@@ -5,3 +5,5 @@ test/
 learn
 test_feature
 test_ppm
+test_zip
+train_old/
