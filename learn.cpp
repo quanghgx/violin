@@ -5,6 +5,11 @@
 #include "cascade_classifier.h"
 #include "utils.h"
 #include <assert.h>
+#include <vector>
+#include <functional>
+#include <memory>
+#include <algorithm>
+
 using namespace std;
 
 struct image_resources
@@ -17,6 +22,7 @@ struct image_resources
     image<double> lum;
     image<double> normalized;
     image<double> integral;
+    image<double> mirror;
 };
 
 void load_dataset( const string& path,
@@ -69,6 +75,7 @@ void load_dataset( const string& path,
             ir.lum = image_argb_to_lum<double>( ir.cropped );
             ir.normalized = image_normalize( ir.lum );
             ir.integral = image_integral( ir.normalized );
+            ir.mirror = image_mirror_vertical( ir.integral );
             s.second.push_back( ir );
         }
     }
@@ -78,7 +85,10 @@ vector<image<double>> slice_dataset_integral( const vector<image_resources>& res
 {
     vector<image<double>> images;
     for( auto& r : resources )
+    {
         images.push_back( r.integral );
+        images.push_back( r.mirror );
+    }
     return images;
 }
 
@@ -210,32 +220,42 @@ int main( int argc, char* argv[] )
     auto trainNegativeIntegrals = slice_dataset_integral(trainNegative);
     auto trainVerifyIntegrals = slice_dataset_integral(trainNegative);
 
-    double fprGoals[] { 0.85, 0.70, 0.55, 0.40, 0.30, 0.25, 0.20 };
+    double fprGoals[] { 0.70, 0.60, 0.50 };
+
+    strong_classifier sc;
 
     for( auto goal : fprGoals )
     {
         printf("goal: %f\n",goal);
         fflush(stdout);
 
+        double fpr = cc.fpr( trainNegativeIntegrals );
+        printf("cc fpr: %f\n",fpr);
+        if( fpr < goal )
+        {
+            printf("    fpr < goal, skipping round.\n");
+            continue;
+        }
+
         vector<image<double>> misclassifiedNegativeIntegrals;
         for( auto ni : trainNegativeIntegrals )
             if( cc.classify( ni, 0, 0, 0.0, 1.0 ) == true )
                 misclassifiedNegativeIntegrals.push_back( ni );
 
-        if( misclassifiedNegativeIntegrals.empty() )
+        if( misclassifiedNegativeIntegrals.empty() || trainPositiveIntegrals.empty() )
         {
-            printf("No misclassified negatives!\n");
+            printf("No training data left!\n");
             continue;
         }
 
-        strong_classifier sc = adaboost_learning( cc,
-                                                  features,
-                                                  trainPositiveIntegrals,
-                                                  misclassifiedNegativeIntegrals,
-                                                  trainVerifyIntegrals,
-                                                  goal,
-                                                  0.01,
-                                                  BASE_RES_W );
+        sc = adaboost_learning( cc,
+                                features,
+                                trainPositiveIntegrals,
+                                misclassifiedNegativeIntegrals,
+                                trainVerifyIntegrals,
+                                goal,
+                                0.01,
+                                BASE_RES_W );
 
         cc.push_back( sc );
 
@@ -249,19 +269,18 @@ int main( int argc, char* argv[] )
                 nfdel++;
             }
         }
-#if 0
+
         for( size_t n=0; n<trainPositiveIntegrals.size(); n++)
         {
-            if (sc.classify(trainPositiveIntegrals[n], 0, 0, 0.0, 1.0) == true)
+            if (sc.classify(trainPositiveIntegrals[n], 0, 0, 0.0, 1.0) == false)
             {
                 trainPositiveIntegrals.erase(trainPositiveIntegrals.begin()+n);
                 n--;
                 fdel++;
             }
         }
-#endif
+
         printf("Removed %lu negatives we got right.\n",nfdel);
-//        printf("Removed %lu positives we got right.\n",fdel);
     }
 
     auto testPositiveIntegrals = slice_dataset_integral(testPositive);
