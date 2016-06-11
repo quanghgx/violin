@@ -29,7 +29,7 @@ double cascade_classifier::fnr( const std::vector<image<double>>& positiveSet )
     size_t fn = 0;
     for( auto& img : positiveSet )
     {
-        if( classify( img, _baseResolution, 0, 0.0, 1.0 ) == false )
+        if( classify( img, 0, 0, 0.0, 1.0 ) == false )
             ++fn;
     }
 
@@ -41,7 +41,7 @@ double cascade_classifier::fpr( const std::vector<image<double>>& negativeSet )
     size_t fp = 0;
     for( auto& img : negativeSet )
     {
-        if( classify( img, _baseResolution, 0, 0.0, 1.0 ) == true )
+        if( classify( img, 0, 0, 0.0, 1.0 ) == true )
             ++fp;
     }
 

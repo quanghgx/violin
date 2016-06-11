@@ -1,7 +1,7 @@
 OFILES=ppm.o utils.o feature.o weak_classifier.o strong_classifier.o cascade_classifier.o
-CXXFLAGS=-pthread -std=c++11 -g -O0
+CXXFLAGS=-pthread -std=c++11 -g -O3
 CXX=g++
-all : libclassy.a tests learn
+all : libclassy.a learn
 
 libclassy.a : $(OFILES)
 	ar rvs libclassy.a $(OFILES)
@@ -18,5 +18,6 @@ clean :
 	rm -f libclassy.a
 	rm -f test_ppm
 	rm -f test_feature
+	rm -f test_zip
 	rm -f learn
 	rm -f *.ppm

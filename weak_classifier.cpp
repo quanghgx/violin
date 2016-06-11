@@ -85,9 +85,6 @@ double weak_classifier::find_optimum_threshold( const std::vector<double>& fvals
         }
     }
 
-//    for( size_t k = 0; k < (fsize + nfsize); ++k )
-//        printf("{%f, %f}, ",ws[k].sum_positive,ws[k].sum_negative);
-
     double minerror = 1.0;
 
     zip( [&]( const weight_sum& weightSum, score s ) {
