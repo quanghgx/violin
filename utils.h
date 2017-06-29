@@ -4,6 +4,6 @@
 #include <vector>
 #include <string>
 
-std::vector<std::string> get_ppm_file_paths( const std::string& path );
+std::vector<std::string> get_ppm_file_paths(const std::string& path);
 
 #endif

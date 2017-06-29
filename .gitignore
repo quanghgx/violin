@@ -8,3 +8,5 @@ test_ppm
 test_zip
 train_old/
 train_unprocessed/
+/nbproject/
+/learn.dSYM/

@@ -7,10 +7,9 @@
 
 using namespace std;
 
-int main( int argc, char* argv[] )
-{
-    vector<int> vs = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-    parallel_for( vs.begin(), vs.end(), []( vector<int>::iterator v ) {
-        printf("%d ",*v);
+int main(int argc, char* argv[]) {
+    vector<int> vs = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    parallel_for(vs.begin(), vs.end(), [](vector<int>::iterator v) {
+        printf("%d ", *v);
     });
 }
